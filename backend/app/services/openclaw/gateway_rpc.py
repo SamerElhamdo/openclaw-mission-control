@@ -194,6 +194,13 @@ def _redacted_url_for_log(raw_url: str) -> str:
     return str(urlunparse(parsed._replace(query="", fragment="")))
 
 
+def _build_connect_headers(config: GatewayConfig) -> dict[str, str]:
+    """Build HTTP headers for WebSocket handshake (e.g. Authorization: Bearer)."""
+    if not config.token or not config.token.strip():
+        return {}
+    return {"Authorization": f"Bearer {config.token.strip()}"}
+
+
 def _create_ssl_context(config: GatewayConfig) -> ssl.SSLContext | None:
     """Create an insecure SSL context override for explicit opt-in TLS bypass.
 
@@ -406,6 +413,9 @@ async def _openclaw_call_once(
     connect_kwargs: dict[str, Any] = {"ping_interval": None}
     if origin is not None:
         connect_kwargs["origin"] = origin
+    extra_headers = _build_connect_headers(config)
+    if extra_headers:
+        connect_kwargs["additional_headers"] = extra_headers
     async with websockets.connect(gateway_url, ssl=ssl_context, **connect_kwargs) as ws:
         first_message = await _recv_first_message_or_none(ws)
         await _ensure_connected(ws, first_message, config)
@@ -422,6 +432,9 @@ async def _openclaw_connect_metadata_once(
     connect_kwargs: dict[str, Any] = {"ping_interval": None}
     if origin is not None:
         connect_kwargs["origin"] = origin
+    extra_headers = _build_connect_headers(config)
+    if extra_headers:
+        connect_kwargs["additional_headers"] = extra_headers
     async with websockets.connect(gateway_url, ssl=ssl_context, **connect_kwargs) as ws:
         first_message = await _recv_first_message_or_none(ws)
         return await _ensure_connected(ws, first_message, config)
