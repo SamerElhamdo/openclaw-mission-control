@@ -54,6 +54,24 @@ function hasExplicitPort(urlString: string): boolean {
   }
 }
 
+/**
+ * Returns error if the URL has a port-like segment that is out of range.
+ * hasExplicitPort returns false for both "no port" and "invalid port".
+ */
+function getInvalidPortError(urlString: string): string | null {
+  try {
+    const url = new URL(urlString);
+    if (!url.port) return null;
+    const port = Number.parseInt(url.port, 10);
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      return "Enter a valid gateway URL.";
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export const validateGatewayUrl = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return "Gateway URL is required.";
@@ -62,12 +80,20 @@ export const validateGatewayUrl = (value: string) => {
     if (url.protocol !== "ws:" && url.protocol !== "wss:") {
       return "Gateway URL must start with ws:// or wss://.";
     }
+    const invalidPortErr = getInvalidPortError(trimmed);
+    if (invalidPortErr) return invalidPortErr;
+    // Explicit port required only when URL has userinfo (user:pass@host) to avoid
+    // ambiguity. Plain ws://host and wss://host use default ports 80/443.
     if (!hasExplicitPort(trimmed)) {
-      return "Gateway URL must include an explicit port.";
+      const withoutScheme = trimmed.slice(trimmed.indexOf("//") + 2);
+      const authority = withoutScheme.split(/[/?#]/)[0] ?? "";
+      if (authority.includes("@")) {
+        return "Gateway URL with userinfo must include an explicit port.";
+      }
     }
     return null;
   } catch {
-    return "Enter a valid gateway URL including port.";
+    return "Enter a valid gateway URL.";
   }
 };
 
